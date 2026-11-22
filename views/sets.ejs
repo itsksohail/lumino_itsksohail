@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LuminoTrack — Match Sets</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="lumino_data_mock.js"></script>
+<style>
+  :root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--accent:#f59e0b;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--muted:#6b7280;--text:#f1f5f9;--subtext:#94a3b8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  nav{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0;height:56px}
+  .logo{font-weight:700;font-size:1.1rem;color:var(--accent);margin-right:32px;letter-spacing:-.5px}
+  .logo span{color:var(--text)}
+  nav a{color:var(--subtext);text-decoration:none;padding:16px 14px;font-size:.875rem;font-weight:500;border-bottom:2px solid transparent;transition:all .15s}
+  nav a:hover{color:var(--text)}
+  nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .main{max-width:1200px;margin:0 auto;padding:24px}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+  .subtitle{color:var(--subtext);font-size:.875rem;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card-title{font-size:.875rem;font-weight:600;color:var(--subtext);text-transform:uppercase;letter-spacing:.04em;margin-bottom:16px}
+  .set-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .set-name{font-size:1rem;font-weight:700}
+  .set-tag{font-size:.7rem;padding:3px 10px;border-radius:999px;font-weight:600;background:rgba(59,130,246,.15);color:var(--blue)}
+  .set-desc{font-size:.8rem;color:var(--subtext);margin-bottom:16px}
+  .matrix{width:100%;border-collapse:collapse;font-size:.8125rem;margin-bottom:12px}
+  .matrix th{padding:9px 12px;text-align:left;color:var(--subtext);font-weight:600;border-bottom:1px solid var(--border);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;position:sticky;top:0;background:var(--card)}
+  .matrix td{padding:8px 12px;border-bottom:1px solid #1a1d27;white-space:nowrap}
+  .matrix tr:hover td{background:#1a2030}
+  .status-ok{color:var(--green);font-weight:600}
+  .status-warn{color:var(--accent);font-weight:600}
+  .status-crit{color:var(--red);font-weight:600}
+  .bar-wrap{width:120px;display:inline-block;vertical-align:middle;margin-left:8px}
+  .bar-bg{height:6px;background:#2a2d3a;border-radius:3px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:3px;transition:width .3s}
+  .alert-count{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;font-size:.7rem;font-weight:700;margin-left:8px}
+  .alert-red{background:rgba(239,68,68,.2);color:var(--red)}
+  .alert-amber{background:rgba(245,158,11,.2);color:var(--accent)}
+  .alert-green{background:rgba(34,197,94,.2);color:var(--green)}
+  .summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+  .summary-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px}
+  .summary-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext);margin-bottom:8px}
+  .summary-value{font-size:1.5rem;font-weight:700}
+  .summary-value.red{color:var(--red)}
+  .summary-value.green{color:var(--green)}
+  .summary-value.amber{color:var(--accent)}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;align-items:center}
+  select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:.875rem;cursor:pointer;outline:none}
+  .chart-wrap{position:relative;height:220px;margin-bottom:0}
+  .ratio-row{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#12151f;border-radius:8px;margin-bottom:8px;font-size:.8125rem}
+  .ratio-label{flex:1;font-weight:600}
+  .ratio-expected{color:var(--subtext);min-width:100px}
+  .ratio-actual{font-weight:700;min-width:80px}
+  .ratio-status{min-width:80px;text-align:right}
+  .info-box{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.8125rem;color:#93c5fd;line-height:1.6}
+  .table-scroll{overflow-x:auto;max-height:360px;overflow-y:auto}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">Lumino<span>Track</span></span>
+  <a href="/see">📊 See It</a>
+  <a href="/plan">🗓️ Plan It</a>
+  <a href="/sets" class="active">🔗 Match Sets</a>
+</nav>
+
+<div class="main">
+  <h1>Set Balance Checker — Match Sets</h1>
+  <p class="subtitle">A parent item needs its child items in the right ratio. Flag every month where a set is out of balance in any godown.</p>
+
+  <div class="info-box">
+    📐 <strong>How ratios work:</strong> Lumino defines how many child items are needed per parent. For example: 1 Pole Clamp RDSS needs 1 Eye Hook. If you have 500 clamps but only 300 eye hooks in the same godown, the set is out of balance — you can only build 300 complete sets. The remaining 200 clamps are stranded.
+  </div>
+
+  <div class="summary-row" id="summaryRow"></div>
+
+  <div class="controls">
+    <label style="color:var(--subtext);font-size:.8rem">Godown:</label>
+    <select id="godownSel"></select>
+    <label style="color:var(--subtext);font-size:.8rem">Month:</label>
+    <select id="monthSel"></select>
+  </div>
+
+  <div id="setsContainer"></div>
+
+  <div class="card">
+    <div class="card-title">Balance Alerts — All Months (Heat View)</div>
+    <div class="chart-wrap"><canvas id="heatChart"></canvas></div>
+  </div>
+</div>
+
+<script>
+const { items, godowns, months, sets, idleByMonth } = LUMINO;
+
+// Setup selectors
+const godownSel = document.getElementById('godownSel');
+const monthSel  = document.getElementById('monthSel');
+
+['All Godowns', ...godowns].forEach(g => {
+  const o = document.createElement('option'); o.value=g; o.textContent=g; godownSel.appendChild(o);
+});
+
+// Only months with activity
+const activeMonths = months.filter(m => {
+  return godowns.some(g => items.some(it => {
+    const d = idleByMonth[it.code]?.[g]?.[m];
+    return d && (d.received>0 || d.godownStock>0);
+  }));
+});
+
+activeMonths.forEach(m => {
+  const o = document.createElement('option'); o.value=m; o.textContent=m; monthSel.appendChild(o);
+});
+monthSel.value = activeMonths[activeMonths.length-1] || activeMonths[0];
+
+// Get set definitions grouped by parent
+const parentCodes = [...new Set(sets.map(s => s.parent))];
+
+function getStock(itemCode, godown, month) {
+  if (godown === 'All Godowns') {
+    return godowns.reduce((s, g) => s + (idleByMonth[itemCode]?.[g]?.[month]?.godownStock || 0), 0);
+  }
+  return idleByMonth[itemCode]?.[godown]?.[month]?.godownStock || 0;
+}
+
+function getItem(code) { return items.find(i => i.code === code); }
+
+function checkBalance(parentCode, godown, month) {
+  const parentStock = getStock(parentCode, godown, month);
+  const childChecks = sets.filter(s => s.parent === parentCode).map(s => {
+    const childStock = getStock(s.child, godown, month);
+    const needed     = parentStock * s.ratio;
+    const actual     = childStock;
+    const pct        = needed > 0 ? Math.round((actual / needed) * 100) : 100;
+    const shortfall  = Math.max(0, needed - actual);
+    return { child: s.child, childName: getItem(s.child)?.name || s.child,
+             childUnit: getItem(s.child)?.unit || '', ratio: s.ratio,
+             parentStock, needed, actual, pct, shortfall,
+             status: pct >= 90 ? 'ok' : pct >= 60 ? 'warn' : 'crit' };
+  });
+  const worstPct = childChecks.length > 0 ? Math.min(...childChecks.map(c => c.pct)) : 100;
+  const completeSets = childChecks.length > 0 ? Math.min(parentStock, ...childChecks.map(c => Math.floor(c.actual / Math.max(c.ratio, 0.0001)))) : parentStock;
+  return { parentStock, childChecks, worstPct, completeSets, stranded: Math.max(0, parentStock - completeSets) };
+}
+
+function render() {
+  const godown = godownSel.value;
+  const month  = monthSel.value;
+
+  // Summary
+  let totalAlerts = 0, totalStranded = 0, totalComplete = 0;
+  for (const pc of parentCodes) {
+    const r = checkBalance(pc, godown, month);
+    if (r.worstPct < 90) totalAlerts++;
+    totalStranded += r.stranded;
+    totalComplete += r.completeSets;
+  }
+  document.getElementById('summaryRow').innerHTML = `
+    <div class="summary-card"><div class="summary-label">Sets Checked</div><div class="summary-value">${parentCodes.length}</div></div>
+    <div class="summary-card"><div class="summary-label">Out-of-Balance Sets</div><div class="summary-value ${totalAlerts>0?'red':'green'}">${totalAlerts}</div></div>
+    <div class="summary-card"><div class="summary-label">Stranded Parents</div><div class="summary-value ${totalStranded>0?'amber':'green'}">${totalStranded.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+    <div class="summary-card"><div class="summary-label">Complete Sets Possible</div><div class="summary-value green">${totalComplete.toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+  `;
+
+  // Sets cards
+  const container = document.getElementById('setsContainer');
+  container.innerHTML = '';
+
+  for (const parentCode of parentCodes) {
+    const parentItem = getItem(parentCode);
+    const result     = checkBalance(parentCode, godown, month);
+    const statusCls  = result.worstPct >= 90 ? 'status-ok' : result.worstPct >= 60 ? 'status-warn' : 'status-crit';
+    const statusText = result.worstPct >= 90 ? '✅ Balanced' : result.worstPct >= 60 ? '⚠️ Partial shortage' : '🚨 Critical shortage';
+
+    let childRows = result.childChecks.map(c => {
+      const barColor = c.pct >= 90 ? '#22c55e' : c.pct >= 60 ? '#f59e0b' : '#ef4444';
+      const shortfallStr = c.shortfall > 0 ? `<span style="color:var(--red)">short ${c.shortfall.toLocaleString('en-IN',{maximumFractionDigits:2})} ${c.childUnit}</span>` : `<span style="color:var(--green)">OK</span>`;
+      return `<tr>
+        <td>${c.childName}</td>
+        <td>${c.childUnit}</td>
+        <td class="num">${c.ratio}</td>
+        <td class="num">${c.needed.toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+        <td class="num">${c.actual.toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+        <td>${shortfallStr}</td>
+        <td>
+          <span class="${c.status==='ok'?'status-ok':c.status==='warn'?'status-warn':'status-crit'}">${c.pct}%</span>
+          <span class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${Math.min(c.pct,100)}%;background:${barColor}"></div></div></span>
+        </td>
+      </tr>`;
+    }).join('');
+
+    container.insertAdjacentHTML('beforeend', `
+    <div class="card">
+      <div class="set-header">
+        <span class="set-name">${parentItem?.name || parentCode}</span>
+        <span class="set-tag">${parentItem?.unit || ''}</span>
+        <span class="${statusCls}" style="margin-left:auto;font-size:.8125rem">${statusText}</span>
+      </div>
+      <div class="set-desc">
+        In stock: <strong>${result.parentStock.toLocaleString('en-IN',{maximumFractionDigits:0})} ${parentItem?.unit||''}</strong> &nbsp;|&nbsp;
+        Can complete: <strong style="color:var(--green)">${result.completeSets.toLocaleString('en-IN',{maximumFractionDigits:0})} sets</strong> &nbsp;|&nbsp;
+        Stranded (missing child): <strong style="color:${result.stranded>0?'var(--red)':'var(--green)'}">
+          ${result.stranded.toLocaleString('en-IN',{maximumFractionDigits:0})} ${parentItem?.unit||''}</strong>
+      </div>
+      <div class="table-scroll">
+        <table class="matrix">
+          <thead><tr>
+            <th>Child Item</th><th>Unit</th><th>Ratio/Parent</th>
+            <th>Needed</th><th>In Stock</th><th>Shortfall</th><th>Balance</th>
+          </tr></thead>
+          <tbody>${childRows}</tbody>
+        </table>
+      </div>
+    </div>`);
+  }
+
+  renderHeatChart(godown);
+}
+
+let heatChart;
+function renderHeatChart(godown) {
+  // Show worst balance % per parent set, per month
+  const labels = activeMonths;
+  const datasets = parentCodes.map((pc, idx) => {
+    const colors = ['#3b82f6','#f59e0b','#22c55e'];
+    const data = activeMonths.map(m => checkBalance(pc, godown, m).worstPct);
+    return {
+      label: getItem(pc)?.name?.slice(0,20) || pc,
+      data,
+      borderColor: colors[idx % colors.length],
+      backgroundColor: 'transparent',
+      tension: .4, pointRadius: 3
+    };
+  });
+
+  if (heatChart) heatChart.destroy();
+  heatChart = new Chart(document.getElementById('heatChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 10 } } },
+        tooltip: {
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}% balanced` }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: '#1f2230' } },
+        y: { min: 0, max: 110, ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v+'%' }, grid: { color: '#1f2230' } }
+      }
+    }
+  });
+}
+
+godownSel.addEventListener('change', render);
+monthSel.addEventListener('change', render);
+render();
+</script>
+</body>
+</html>

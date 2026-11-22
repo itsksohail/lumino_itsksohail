@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LuminoTrack — Plan It</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="lumino_data_mock.js"></script>
+<style>
+  :root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--accent:#f59e0b;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--muted:#6b7280;--text:#f1f5f9;--subtext:#94a3b8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  nav{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0;height:56px}
+  .logo{font-weight:700;font-size:1.1rem;color:var(--accent);margin-right:32px;letter-spacing:-.5px}
+  .logo span{color:var(--text)}
+  nav a{color:var(--subtext);text-decoration:none;padding:16px 14px;font-size:.875rem;font-weight:500;border-bottom:2px solid transparent;transition:all .15s}
+  nav a:hover{color:var(--text)}
+  nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .main{max-width:1200px;margin:0 auto;padding:24px}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+  .subtitle{color:var(--subtext);font-size:.875rem;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card-title{font-size:.875rem;font-weight:600;color:var(--subtext);text-transform:uppercase;letter-spacing:.04em;margin-bottom:16px}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;align-items:center}
+  select,input[type=range]{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:.875rem;cursor:pointer;outline:none}
+  select:focus{border-color:var(--accent)}
+  .timeline{display:flex;flex-direction:column;gap:12px}
+  .month-block{background:#12151f;border:1px solid var(--border);border-radius:10px;padding:16px;position:relative;transition:border-color .2s}
+  .month-block.current{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)22}
+  .month-block.past{opacity:.7}
+  .month-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .month-label{font-weight:700;font-size:1rem}
+  .month-tag{font-size:.7rem;padding:3px 10px;border-radius:999px;font-weight:600}
+  .tag-current{background:rgba(245,158,11,.2);color:var(--accent)}
+  .tag-past{background:rgba(107,114,128,.15);color:var(--muted)}
+  .month-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:12px}
+  .fact{background:var(--card);border-radius:8px;padding:12px}
+  .fact-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--subtext);margin-bottom:4px}
+  .fact-value{font-size:1.25rem;font-weight:700}
+  .fact-value.red{color:var(--red)}
+  .fact-value.green{color:var(--green)}
+  .fact-value.amber{color:var(--accent)}
+  .fact-value.blue{color:var(--blue)}
+  .recs{display:flex;flex-direction:column;gap:6px}
+  .rec{display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-radius:8px;font-size:.8125rem}
+  .rec-order{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25)}
+  .rec-hold{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2)}
+  .rec-move{background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2)}
+  .rec-ok{background:rgba(107,114,128,.08);border:1px solid rgba(107,114,128,.15)}
+  .rec-icon{font-size:1rem;line-height:1.4;flex-shrink:0}
+  .rec-text strong{display:block;font-weight:600;margin-bottom:2px}
+  .rec-text span{color:var(--subtext);font-size:.75rem}
+  .slider-row{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .slider-row label{font-size:.8rem;color:var(--subtext);min-width:160px}
+  .slider-val{font-size:.875rem;font-weight:600;min-width:40px;text-align:right}
+  input[type=range]{flex:1;accent-color:var(--accent);background:transparent;border:none;padding:4px 0}
+  .info-box{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.8125rem;color:#fde68a;line-height:1.6}
+  .chart-wrap{position:relative;height:220px;margin-bottom:0}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">Lumino<span>Track</span></span>
+  <a href="/see">📊 See It</a>
+  <a href="/plan" class="active">🗓️ Plan It</a>
+  <a href="/sets">🔗 Match Sets</a>
+</nav>
+
+<div class="main">
+  <h1>Order Planner — Plan It</h1>
+  <p class="subtitle">Month-by-month replay. Each month only knows what was known at that date. What to order, hold, or move — driven by actual usage, not a fixed plan.</p>
+
+  <div class="info-box">
+    💡 <strong>How this works:</strong> The planner uses actual consumption velocity (how much was used each month) to predict next month's need. It compares that against what's currently in stock and what's already on order (placed lead-time days ago). It recommends ordering only the gap — not a fixed monthly quota.
+  </div>
+
+  <div class="controls">
+    <label style="color:var(--subtext);font-size:.8rem">Item:</label>
+    <select id="itemSel"></select>
+    <label style="color:var(--subtext);font-size:.8rem">Buffer months:</label>
+    <input type="range" id="bufferSlider" min="0.5" max="3" step="0.5" value="1" style="width:120px">
+    <span id="bufferVal" style="color:var(--accent);font-weight:700;font-size:.875rem">1.0×</span>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Received vs Actually Needed — Comparison</div>
+    <div class="chart-wrap"><canvas id="compareChart"></canvas></div>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<script>
+const { items, godowns, months, idleByMonth, moves } = LUMINO;
+
+const itemSel = document.getElementById('itemSel');
+items.forEach(it => { const o=document.createElement('option'); o.value=it.code; o.textContent=it.name; itemSel.appendChild(o); });
+
+const bufferSlider = document.getElementById('bufferSlider');
+const bufferVal    = document.getElementById('bufferVal');
+bufferSlider.addEventListener('input', () => { bufferVal.textContent = parseFloat(bufferSlider.value).toFixed(1)+'×'; render(); });
+
+let compareChart;
+
+function getMonthlyConsumption(itemCode) {
+  return months.map(m => {
+    const proj = idleByMonth[itemCode]?.['PROJECT']?.[m] || {};
+    return { m, cons: proj.consumption || 0 };
+  });
+}
+
+function getTotalReceivedByMonth(itemCode) {
+  return months.map(m => {
+    return godowns.reduce((s, g) => s + (idleByMonth[itemCode]?.[g]?.[m]?.received || 0), 0);
+  });
+}
+
+function getTotalGodownStock(itemCode, m) {
+  return godowns.reduce((s, g) => s + (idleByMonth[itemCode]?.[g]?.[m]?.godownStock || 0), 0);
+}
+
+function render() {
+  const itemCode = itemSel.value;
+  const item = items.find(i => i.code === itemCode);
+  const buffer = parseFloat(bufferSlider.value);
+  const leadMonths = Math.ceil(item.lead / 30);
+
+  const consumption = getMonthlyConsumption(itemCode);
+  const received    = getTotalReceivedByMonth(itemCode);
+
+  // Find active window
+  const firstIdx = consumption.findIndex(d => d.cons > 0) - 1;
+  const firstRec  = received.findIndex(r => r > 0);
+  const startIdx  = Math.max(0, Math.min(firstIdx < 0 ? firstRec : firstIdx, firstRec));
+  const lastIdx   = consumption.map((d,i)=>(d.cons>0||received[i]>0)?i:-1).filter(x=>x>=0).pop() ?? 0;
+
+  const activeMonths = months.slice(startIdx, lastIdx + 2);
+  const activeCons   = consumption.slice(startIdx, lastIdx + 2);
+  const activeRec    = received.slice(startIdx, lastIdx + 2);
+
+  // Build what-should-have-been-ordered curve
+  const idealOrder = activeCons.map((d, i) => {
+    if (i < 2) return activeRec[i]; // not enough history
+    const avgVelocity = activeCons.slice(Math.max(0,i-3), i).reduce((s,x)=>s+x.cons,0) /
+                        Math.min(i, 3);
+    const needed = avgVelocity * (leadMonths + buffer);
+    const stock  = getTotalGodownStock(itemCode, activeMonths[i]);
+    const gap    = Math.max(0, needed - stock);
+    return Math.round(gap * 10) / 10;
+  });
+
+  // Update comparison chart
+  if (compareChart) compareChart.destroy();
+  compareChart = new Chart(document.getElementById('compareChart'), {
+    type: 'bar',
+    data: {
+      labels: activeMonths,
+      datasets: [
+        { label: 'Actually Received (fixed plan)', data: activeRec, backgroundColor: 'rgba(239,68,68,.6)', borderRadius: 3 },
+        { label: 'What Should Have Been Ordered', data: idealOrder, backgroundColor: 'rgba(34,197,94,.6)', borderRadius: 3 },
+        { label: 'Actual Consumption', data: activeCons.map(d=>d.cons), type: 'line',
+          borderColor: '#f59e0b', backgroundColor: 'transparent', pointRadius: 4, tension: .4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 }, maxRotation: 45 }, grid: { color: '#1f2230' } },
+        y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1f2230' } }
+      }
+    }
+  });
+
+  // Build timeline cards
+  const timeline = document.getElementById('timeline');
+  timeline.innerHTML = '';
+
+  for (let i = 0; i < activeMonths.length; i++) {
+    const m     = activeMonths[i];
+    const cons  = activeCons[i]?.cons || 0;
+    const rec   = activeRec[i] || 0;
+    const stock = getTotalGodownStock(itemCode, m);
+
+    // Velocity: avg of last 3 months consumption
+    const histCons = activeCons.slice(Math.max(0, i-3), i).map(d=>d.cons).filter(x=>x>0);
+    const velocity = histCons.length > 0 ? histCons.reduce((a,b)=>a+b,0)/histCons.length : cons;
+
+    const neededNextMonth    = Math.round(velocity * buffer * 10) / 10;
+    const coverageMonths     = velocity > 0 ? Math.round((stock / velocity) * 10) / 10 : '∞';
+    const shouldOrder        = idealOrder[i] || 0;
+    const overReceived       = Math.max(0, rec - (cons * (1 + buffer)));
+    const fixedPlanWaste     = Math.round(overReceived * 10) / 10;
+
+    // Determine best action
+    let recs = [];
+    if (stock <= 0 && velocity > 0) {
+      recs.push({ cls:'rec-order', icon:'🚨', title:`URGENT: Order ${(velocity * leadMonths * 1.2).toFixed(1)} ${item.unit}`, detail:`Stock is ZERO. Lead time is ${item.lead} days. Order immediately.` });
+    } else if (shouldOrder > 0) {
+      recs.push({ cls:'rec-order', icon:'📦', title:`Order ${shouldOrder.toFixed(1)} ${item.unit}`, detail:`Based on ${velocity.toFixed(1)} ${item.unit}/month velocity × ${buffer}× buffer + ${leadMonths} month lead time` });
+    } else {
+      recs.push({ cls:'rec-ok', icon:'✅', title:'Hold — no order needed', detail:`${coverageMonths} months of stock in hand covers lead time + buffer` });
+    }
+
+    if (fixedPlanWaste > 0) {
+      recs.push({ cls:'rec-hold', icon:'⚠️', title:`Fixed plan over-delivered ${fixedPlanWaste.toFixed(1)} ${item.unit}`, detail:`What arrived this month exceeded actual need by this amount. This is idle capital.` });
+    }
+
+    // Transfer advice: check if one godown is high and another is low
+    const godownStocks = godowns.map(g => ({ g, s: idleByMonth[itemCode]?.[g]?.[m]?.godownStock || 0 }));
+    const high = godownStocks.filter(x => x.s > velocity * 2);
+    const low  = godownStocks.filter(x => x.s < velocity * 0.5 && x.s >= 0);
+    if (high.length && low.length) {
+      recs.push({ cls:'rec-move', icon:'↔️', title:`Transfer from ${high[0].g.replace('KANPUR ','')} → ${low[0].g.replace('KANPUR ','')}`, detail:`${high[0].g} has ${high[0].s.toFixed(0)} idle; ${low[0].g} has only ${low[0].s.toFixed(0)}. Move before ordering new.` });
+    }
+
+    const isActive = rec > 0 || cons > 0 || stock > 0;
+    if (!isActive) continue;
+
+    const html = `
+    <div class="month-block">
+      <div class="month-header">
+        <span class="month-label">${m}</span>
+        <span class="month-tag tag-past">Month ${i+1}</span>
+      </div>
+      <div class="month-facts">
+        <div class="fact">
+          <div class="fact-label">Received</div>
+          <div class="fact-value blue">${rec.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+        </div>
+        <div class="fact">
+          <div class="fact-label">Consumed</div>
+          <div class="fact-value green">${cons.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+        </div>
+        <div class="fact">
+          <div class="fact-label">Godown Stock</div>
+          <div class="fact-value ${stock>velocity*3?'red':stock>velocity?'amber':'green'}">${stock.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+        </div>
+        <div class="fact">
+          <div class="fact-label">Avg Velocity</div>
+          <div class="fact-value">${velocity.toFixed(1)}<span style="font-size:.7rem;color:var(--subtext)">/${item.unit}/mo</span></div>
+        </div>
+        <div class="fact">
+          <div class="fact-label">Coverage</div>
+          <div class="fact-value ${Number(coverageMonths) > leadMonths+1?'red':'green'}">${coverageMonths}<span style="font-size:.7rem;color:var(--subtext)"> months</span></div>
+        </div>
+      </div>
+      <div class="recs">${recs.map(r=>`
+        <div class="rec ${r.cls}">
+          <span class="rec-icon">${r.icon}</span>
+          <div class="rec-text"><strong>${r.title}</strong><span>${r.detail}</span></div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+    timeline.insertAdjacentHTML('beforeend', html);
+  }
+}
+
+itemSel.addEventListener('change', render);
+render();
+</script>
+</body>
+</html>

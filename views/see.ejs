@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LuminoTrack — See It</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="lumino_data_mock.js"></script>
+<style>
+  :root {
+    --bg:#0f1117;--card:#1a1d27;--border:#2a2d3a;--accent:#f59e0b;
+    --green:#22c55e;--red:#ef4444;--blue:#3b82f6;--muted:#6b7280;
+    --text:#f1f5f9;--subtext:#94a3b8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+  nav{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:0;height:56px}
+  .logo{font-weight:700;font-size:1.1rem;color:var(--accent);margin-right:32px;letter-spacing:-0.5px}
+  .logo span{color:var(--text)}
+  nav a{color:var(--subtext);text-decoration:none;padding:16px 14px;font-size:.875rem;font-weight:500;border-bottom:2px solid transparent;transition:all .15s}
+  nav a:hover{color:var(--text)}
+  nav a.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .main{max-width:1400px;margin:0 auto;padding:24px}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:4px}
+  .subtitle{color:var(--subtext);font-size:.875rem;margin-bottom:24px}
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+  .kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .kpi-label{font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--subtext);margin-bottom:8px}
+  .kpi-value{font-size:2rem;font-weight:700;line-height:1}
+  .kpi-value.red{color:var(--red)}
+  .kpi-value.green{color:var(--green)}
+  .kpi-value.amber{color:var(--accent)}
+  .kpi-sub{font-size:.75rem;color:var(--subtext);margin-top:6px}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;align-items:center}
+  select,button{background:var(--card);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:8px;font-size:.875rem;cursor:pointer;outline:none}
+  select:focus,button:focus{border-color:var(--accent)}
+  button.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+  .card-title{font-size:.875rem;font-weight:600;color:var(--subtext);text-transform:uppercase;letter-spacing:.04em;margin-bottom:16px}
+  .chart-wrap{position:relative;height:280px}
+  .table-wrap{overflow-x:auto;margin-top:0}
+  table{width:100%;border-collapse:collapse;font-size:.8125rem}
+  thead th{padding:10px 12px;text-align:left;color:var(--subtext);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;background:var(--card);font-size:.75rem;text-transform:uppercase;letter-spacing:.04em}
+  tbody tr{border-bottom:1px solid #1f2230;transition:background .1s}
+  tbody tr:hover{background:#1f2230}
+  tbody td{padding:9px 12px;white-space:nowrap}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.7rem;font-weight:600}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-amber{background:rgba(245,158,11,.15);color:var(--accent)}
+  .idle-pct{font-weight:700}
+  .idle-high{color:var(--red)}
+  .idle-med{color:var(--accent)}
+  .idle-low{color:var(--green)}
+  .alert-banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:.875rem;color:#fca5a5}
+  .alert-banner strong{color:var(--red)}
+  .pill-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .pill{padding:4px 12px;border-radius:999px;font-size:.75rem;cursor:pointer;border:1px solid var(--border);color:var(--subtext);transition:all .15s}
+  .pill:hover,.pill.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+  .num{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">Lumino<span>Track</span></span>
+  <a href="/see" class="active">📊 See It</a>
+  <a href="/plan">🗓️ Plan It</a>
+  <a href="/sets" >🔗 Match Sets</a>
+</nav>
+
+<div class="main">
+  <h1>Stock Dashboard — See It</h1>
+  <p class="subtitle">What came in · what was issued · what was used · what sat idle &mdash; per item, godown, month</p>
+
+  <div class="alert-banner" id="alertBanner">
+    ⚠️ <strong>1,700 Poles Alert:</strong> Over the first 3 months, 1,000 poles/month arrived on a fixed plan. The site used 400, 600, then 300. After month 3, <strong>1,700 poles lay idle</strong> in the yard. Nobody slowed the trucks.
+  </div>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="controls">
+    <label style="color:var(--subtext);font-size:.8rem">Item:</label>
+    <select id="itemSel"></select>
+    <label style="color:var(--subtext);font-size:.8rem">Godown:</label>
+    <select id="godownSel"></select>
+    <label style="color:var(--subtext);font-size:.8rem">View:</label>
+    <button id="btnMonthly" class="active" onclick="setView('monthly')">Monthly</button>
+    <button id="btnCumulative" onclick="setView('cumulative')">Cumulative</button>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title" id="chartTitle">Stock Flow — Monthly</div>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Idle Stock by Godown (Latest)</div>
+      <div class="chart-wrap"><canvas id="godownChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Month-by-Month Detail Table</div>
+    <div class="pill-row" id="godownPills"></div>
+    <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Received</th>
+            <th>Transfer IN</th>
+            <th>Transfer OUT</th>
+            <th>Issued to Contractor</th>
+            <th>Returned</th>
+            <th>Consumed (Project)</th>
+            <th>Godown Stock</th>
+            <th>With Contractor</th>
+            <th>Idle %</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<script>
+
+const { items, godowns, months, idleByMonth, moves, receipts } = LUMINO;
+
+// --- Selectors ---
+const itemSel = document.getElementById('itemSel');
+const godownSel = document.getElementById('godownSel');
+
+items.forEach(it => {
+  const o = document.createElement('option');
+  o.value = it.code; o.textContent = it.name; itemSel.appendChild(o);
+});
+['All Godowns', ...godowns].forEach(g => {
+  const o = document.createElement('option'); o.value = g; o.textContent = g; godownSel.appendChild(o);
+});
+
+// Pills
+const pillRow = document.getElementById('godownPills');
+['All Godowns', ...godowns].forEach(g => {
+  const p = document.createElement('span');
+  p.className = 'pill' + (g === 'All Godowns' ? ' active' : '');
+  p.textContent = g === 'All Godowns' ? 'All' : g.replace('KANPUR ', '');
+  p.onclick = () => { godownSel.value = g; document.querySelectorAll('.pill').forEach(x=>x.classList.remove('active')); p.classList.add('active'); render(); };
+  pillRow.appendChild(p);
+});
+
+let view = 'monthly';
+function setView(v) {
+  view = v;
+  document.getElementById('btnMonthly').className = v==='monthly'?'active':'';
+  document.getElementById('btnCumulative').className = v==='cumulative'?'active':'';
+  render();
+}
+
+// Charts
+let mainChart, godownChart;
+function mkChart(id, cfg) {
+  const c = document.getElementById(id);
+  return new Chart(c, cfg);
+}
+
+function render() {
+  const itemCode = itemSel.value;
+  const item = items.find(i => i.code === itemCode);
+  const selGodown = godownSel.value;
+  const allG = godowns;
+
+  // Aggregate across godowns if "All Godowns"
+  const monthlyData = months.map(m => {
+    const gList = selGodown === 'All Godowns' ? allG : [selGodown];
+    let received=0, tIn=0, tOut=0, issued=0, returned=0, godownStock=0;
+    for (const g of gList) {
+      const d = idleByMonth[itemCode]?.[g]?.[m] || {};
+      received   += d.received || 0;
+      tIn        += d.tIn || 0;
+      tOut       += d.tOut || 0;
+      issued     += d.issued || 0;
+      returned   += d.returned || 0;
+      godownStock+= d.godownStock || 0;
+    }
+    const proj = idleByMonth[itemCode]?.['PROJECT']?.[m] || {};
+    return { m, received, tIn, tOut, issued, returned, godownStock,
+             consumption: proj.consumption||0, withContractor: proj.withContractor||0,
+             cumCons: proj.cumConsumption||0 };
+  });
+
+  // Filter to months with any activity
+  const firstActivity = monthlyData.findIndex(d => d.received>0||d.issued>0||d.consumption>0||d.godownStock>0);
+  const lastActivity  = monthlyData.map((d,i) => (d.received>0||d.issued>0||d.consumption>0||d.godownStock>0)?i:-1).filter(x=>x>=0).pop() ?? 0;
+  const active = monthlyData.slice(Math.max(0,firstActivity), lastActivity+1);
+  const labels = active.map(d => d.m.replace('-','/'));
+
+  // Cumulative mode
+  let chartData;
+  if (view === 'cumulative') {
+    let cumRec=0, cumIssue=0, cumCons=0, cumStock=[];
+    chartData = {
+      received:[], issued:[], consumption:[], godownStock:[]
+    };
+    for (const d of active) {
+      cumRec += d.received; cumIssue += d.issued; cumCons += d.consumption;
+      chartData.received.push(cumRec);
+      chartData.issued.push(cumIssue);
+      chartData.consumption.push(cumCons);
+      chartData.godownStock.push(d.godownStock);
+    }
+    document.getElementById('chartTitle').textContent = 'Stock Flow — Cumulative';
+  } else {
+    chartData = {
+      received:    active.map(d => d.received),
+      issued:      active.map(d => d.issued),
+      consumption: active.map(d => d.consumption),
+      godownStock: active.map(d => d.godownStock),
+    };
+    document.getElementById('chartTitle').textContent = 'Stock Flow — Monthly';
+  }
+
+  // Update main chart
+  if (mainChart) mainChart.destroy();
+  mainChart = new Chart(document.getElementById('mainChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Received', data: chartData.received, backgroundColor:'rgba(59,130,246,.7)', borderRadius:3 },
+        { label:'Issued to Contractor', data: chartData.issued, backgroundColor:'rgba(245,158,11,.7)', borderRadius:3 },
+        { label:'Consumed', data: chartData.consumption, backgroundColor:'rgba(34,197,94,.7)', borderRadius:3 },
+        { label:'Godown Stock (Idle)', data: chartData.godownStock, type:'line',
+          borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.1)', fill:true, tension:.4, pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11} } } },
+      scales:{
+        x:{ ticks:{color:'#6b7280',font:{size:10},maxRotation:45}, grid:{color:'#1f2230'} },
+        y:{ ticks:{color:'#6b7280',font:{size:10}}, grid:{color:'#1f2230'} }
+      }
+    }
+  });
+
+  // Godown bar chart (latest stock per godown)
+  const latestMonth = active.length > 0 ? active[active.length-1].m : months[months.length-1];
+  const gdStocks = godowns.map(g => idleByMonth[itemCode]?.[g]?.[latestMonth]?.godownStock || 0);
+  if (godownChart) godownChart.destroy();
+  godownChart = new Chart(document.getElementById('godownChart'), {
+    type: 'bar',
+    data: {
+      labels: godowns.map(g => g.replace('KANPUR ','')),
+      datasets:[{ label:'Idle Godown Stock', data:gdStocks,
+        backgroundColor: gdStocks.map(v => v > 500 ? 'rgba(239,68,68,.8)' : v > 100 ? 'rgba(245,158,11,.8)' : 'rgba(34,197,94,.8)'),
+        borderRadius:6 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{color:'#6b7280',font:{size:10}}, grid:{color:'#1f2230'} },
+        y:{ ticks:{color:'#6b7280',font:{size:10}}, grid:{color:'#1f2230'} }
+      }
+    }
+  });
+
+  // Table
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  for (const d of active) {
+    if (d.received===0 && d.issued===0 && d.consumption===0 && d.godownStock===0) continue;
+    const totalIn = d.received + d.tIn;
+    const totalMat = totalIn || 1;
+    const idlePct = d.godownStock > 0 ? Math.round((d.godownStock / Math.max(totalMat, d.godownStock)) * 100) : 0;
+    const cls = idlePct > 60 ? 'idle-high' : idlePct > 30 ? 'idle-med' : 'idle-low';
+    const fmt = n => n > 0 ? `<span class="num">${n.toLocaleString('en-IN', {maximumFractionDigits:3})}</span>` : `<span style="color:var(--muted)">—</span>`;
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td><strong>${d.m}</strong></td>
+      <td>${fmt(d.received)}</td>
+      <td>${fmt(d.tIn)}</td>
+      <td>${fmt(d.tOut)}</td>
+      <td>${fmt(d.issued)}</td>
+      <td>${fmt(d.returned)}</td>
+      <td>${fmt(d.consumption)}</td>
+      <td><strong>${fmt(d.godownStock)}</strong></td>
+      <td>${fmt(d.withContractor)}</td>
+      <td><span class="idle-pct ${cls}">${idlePct}%</span></td>
+    </tr>`);
+  }
+
+  // KPIs
+  renderKPIs(monthlyData, item);
+}
+
+function renderKPIs(monthlyData, item) {
+  const totalReceived = monthlyData.reduce((s,d)=>s+d.received,0);
+  const totalConsumed = monthlyData.reduce((s,d)=>s+d.consumption,0);
+  const latestStock   = [...godowns].reduce((s,g)=> s + (idleByMonth[item.code]?.[g]?.[months[months.length-1]]?.godownStock||0),0);
+  const idlePct = totalReceived > 0 ? Math.round((latestStock/totalReceived)*100) : 0;
+  const ordersCouldHaveSaved = Math.round(totalReceived - totalConsumed);
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total Received</div>
+      <div class="kpi-value">${totalReceived.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+      <div class="kpi-sub">${item.unit} · all godowns · all time</div></div>
+    <div class="kpi"><div class="kpi-label">Total Consumed</div>
+      <div class="kpi-value green">${totalConsumed.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+      <div class="kpi-sub">${item.unit} · used at site</div></div>
+    <div class="kpi"><div class="kpi-label">Currently Idle (Godowns)</div>
+      <div class="kpi-value ${idlePct>50?'red':idlePct>25?'amber':'green'}">${latestStock.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+      <div class="kpi-sub">${item.unit} · ${idlePct}% of received never used</div></div>
+    <div class="kpi"><div class="kpi-label">Lead Time</div>
+      <div class="kpi-value amber">${item.lead}</div>
+      <div class="kpi-sub">days · orders must plan this far ahead</div></div>
+  `;
+}
+
+itemSel.addEventListener('change', render);
+godownSel.addEventListener('change', () => {
+  const v = godownSel.value;
+  document.querySelectorAll('.pill').forEach((p,i) => {
+    const vals = ['All Godowns', ...godowns];
+    p.classList.toggle('active', vals[i] === v);
+  });
+  render();
+});
+
+render();
+</script>
+
+</body>
+</html>
